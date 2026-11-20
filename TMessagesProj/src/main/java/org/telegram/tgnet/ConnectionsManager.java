@@ -660,7 +660,18 @@ public class ConnectionsManager extends BaseController {
     }
 
     public void switchCustomServer(String address, int port, boolean enabled) {
+        customServerAddress = address == null ? "" : address;
+        MessagesController.getGlobalMainSettings().edit().putString("custom_server_address", customServerAddress).apply();
         native_switchCustomServer(currentAccount, address == null ? "" : address, port, enabled);
+    }
+
+    private static String customServerAddress = "";
+
+    public static String getCustomServerAddress() {
+        if (TextUtils.isEmpty(customServerAddress)) {
+            customServerAddress = MessagesController.getGlobalMainSettings().getString("custom_server_address", "");
+        }
+        return customServerAddress;
     }
 
     public int getConnectionState() {

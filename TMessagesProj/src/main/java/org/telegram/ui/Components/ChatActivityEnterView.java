@@ -12297,6 +12297,7 @@ public class ChatActivityEnterView extends FrameLayout implements
                                     info.hasMediaSpoilers = entry.hasSpoiler;
                                     info.stars = entry.starsAmount;
                                     info.highQuality = entry.isHighQuality();
+                                    info.sendOriginal = entry.sendOriginal;
                                     photos.add(info);
                                     entry.reset();
 

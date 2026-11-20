@@ -1233,6 +1233,7 @@ public class ChatActivity extends BaseFragment implements
     public final static int OPTION_ADD_STICKER_TO_FAVORITES = 20;
     public final static int OPTION_DELETE_STICKER_FROM_FAVORITES = 21;
     public final static int OPTION_COPY_LINK = 22;
+    public final static int OPTION_COPY_MEDIA_LINK = 36;
     public final static int OPTION_REPORT_CHAT = 23;
     public final static int OPTION_CANCEL_SENDING = 24;
     public final static int OPTION_UNVOTE = 25;
@@ -20079,6 +20080,7 @@ public class ChatActivity extends BaseFragment implements
                 info.videoEditedInfo = entry.editedInfo;
                 info.canDeleteAfter = entry.canDeleteAfter;
                 info.highQuality = entry.isHighQuality();
+                info.sendOriginal = entry.sendOriginal;
                 photos.add(info);
                 entry.reset();
             }
@@ -33600,6 +33602,23 @@ public class ChatActivity extends BaseFragment implements
         MediaController.saveFile(path, getParentActivity(), messageObject.isVideo() ? 1 : 0, null, null);
     }
 
+    private String getMediaDirectLink(MessageObject messageObject) {
+        if (messageObject == null || messageObject.messageOwner == null || messageObject.messageOwner.media == null) {
+            return null;
+        }
+        final String host = ConnectionsManager.getCustomServerAddress();
+        if (TextUtils.isEmpty(host)) {
+            return null;
+        }
+        final TLRPC.MessageMedia media = messageObject.messageOwner.media;
+        if (media.photo != null) {
+            return "http://" + host + ":2401/photo/" + media.photo.id + "/max/" + media.photo.access_hash;
+        } else if (media.document != null) {
+            return "http://" + host + ":2401/file/" + media.document.id + "/" + media.document.access_hash;
+        }
+        return null;
+    }
+
     private void processSelectedOption(int option) {
         if (selectedObject == null || getParentActivity() == null) {
             return;
@@ -34286,6 +34305,16 @@ public class ChatActivity extends BaseFragment implements
                     }
 
                 }));
+                break;
+            }
+            case OPTION_COPY_MEDIA_LINK: {
+                final String directLink = getMediaDirectLink(selectedObject);
+                if (directLink != null) {
+                    AndroidUtilities.addToClipboard(directLink);
+                    if (BulletinFactory.canShowBulletin(ChatActivity.this)) {
+                        BulletinFactory.of(ChatActivity.this).createCopyLinkBulletin(false).show();
+                    }
+                }
                 break;
             }
             case OPTION_REPORT_CHAT: {
@@ -46336,6 +46365,11 @@ public class ChatActivity extends BaseFragment implements
                 if (!isEphemeral && !selectedObject.isSponsored() && chatMode != MODE_SCHEDULED && ChatObject.isChannel(currentChat) && !ChatObject.isMonoForum(currentChat) && selectedObject.getDialogId() != mergeDialogId) {
                     items.add(LocaleController.getString(R.string.CopyLink));
                     options.add(OPTION_COPY_LINK);
+                    icons.add(R.drawable.msg_link);
+                }
+                if (!isEphemeral && selectedObject != null && selectedObject.messageOwner != null && selectedObject.messageOwner.media != null && (selectedObject.messageOwner.media.photo != null || selectedObject.messageOwner.media.document != null)) {
+                    items.add("复制资源直链");
+                    options.add(OPTION_COPY_MEDIA_LINK);
                     icons.add(R.drawable.msg_link);
                 }
                 if (selectedObject != null && selectedObject.messageOwner != null && selectedObject.messageOwner.action == null && currentChat != null && currentChat.forum && !isTopic && selectedObject.messageOwner != null && selectedObject.messageOwner.reply_to != null && selectedObject.messageOwner.reply_to.forum_topic) {

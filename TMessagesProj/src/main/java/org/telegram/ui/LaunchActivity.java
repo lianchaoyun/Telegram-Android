@@ -6654,6 +6654,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             info.videoEditedInfo = entry.editedInfo;
             info.canDeleteAfter = entry.canDeleteAfter;
             info.highQuality = entry.isHighQuality();
+            info.sendOriginal = entry.sendOriginal;
             infos.add(info);
         }
         return infos;

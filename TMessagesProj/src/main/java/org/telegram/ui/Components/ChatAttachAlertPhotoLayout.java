@@ -3330,22 +3330,32 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 parentAlert.getPhotoPreviewLayout().startMediaCrossfade();
             }
 
-            boolean highQualityEnabled = false;
+            int qualityMode = 0;
             for (Map.Entry<Object, Object> en : selectedPhotos.entrySet()) {
                 MediaController.PhotoEntry entry = (MediaController.PhotoEntry) en.getValue();
-                if (entry.isHighQuality()) {
-                    highQualityEnabled = true;
+                if (entry.sendOriginal) {
+                    qualityMode = 2;
                     break;
                 }
+                if (entry.isHighQuality()) {
+                    qualityMode = 1;
+                }
             }
-            highQualityEnabled = !highQualityEnabled;
+            qualityMode = (qualityMode + 1) % 3;
+            boolean highQualityEnabled = (qualityMode == 1);
+            final boolean originalEnabled = (qualityMode == 2);
             boolean finalHighQualityEnabled = highQualityEnabled;
             AndroidUtilities.runOnUIThread(()-> {
-                qualityItem.setText(LocaleController.getString(finalHighQualityEnabled ? R.string.SendInStandardQuality : R.string.SendInHighQuality));
-                if (finalHighQualityEnabled) {
-                    qualityItem.setIcon(R.drawable.menu_quality_sd);
-                } else {
+                if (originalEnabled) {
+                    qualityItem.setText("不压缩原图");
                     qualityItem.setIcon(R.drawable.menu_quality_hd);
+                } else {
+                    qualityItem.setText(LocaleController.getString(finalHighQualityEnabled ? R.string.SendInStandardQuality : R.string.SendInHighQuality));
+                    if (finalHighQualityEnabled) {
+                        qualityItem.setIcon(R.drawable.menu_quality_sd);
+                    } else {
+                        qualityItem.setIcon(R.drawable.menu_quality_hd);
+                    }
                 }
             }, 200);
 
@@ -3354,6 +3364,7 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
                 if (entry.getValue() instanceof MediaController.PhotoEntry) {
                     MediaController.PhotoEntry photoEntry = (MediaController.PhotoEntry) entry.getValue();
                     photoEntry.highQuality = highQualityEnabled;
+                    photoEntry.sendOriginal = originalEnabled;
                     photoEntry.isChatPreviewSpoilerRevealed = false;
                     photoEntry.isAttachSpoilerRevealed = false;
                     selectedIds.add(photoEntry.imageId);
@@ -3459,6 +3470,19 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         return count;
     }
 
+    public int getSelectedPhotosOriginalCount() {
+        int count = 0;
+        for (Object o : selectedPhotos.values()) {
+            if (o instanceof MediaController.PhotoEntry) {
+                MediaController.PhotoEntry entry = (MediaController.PhotoEntry) o;
+                if (entry.sendOriginal && !entry.isVideo && entry.editedInfo == null) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
     @Override
     public void onSelectedItemsCountChanged(int count) {
         final boolean hasCompress;
@@ -3519,7 +3543,10 @@ public class ChatAttachAlertPhotoLayout extends ChatAttachAlert.AttachAlertLayou
         }
         if (parentAlert != null) {
             if (getSelectedPhotosCount() == count) {
-                if (getSelectedPhotosHighQualityCount() > 0) {
+                if (getSelectedPhotosOriginalCount() > 0) {
+                    qualityItem.setText("不压缩原图");
+                    qualityItem.setIcon(R.drawable.menu_quality_hd);
+                } else if (getSelectedPhotosHighQualityCount() > 0) {
                     qualityItem.setText(LocaleController.getString(R.string.SendInStandardQuality));
                     qualityItem.setIcon(R.drawable.menu_quality_sd);
                 } else {

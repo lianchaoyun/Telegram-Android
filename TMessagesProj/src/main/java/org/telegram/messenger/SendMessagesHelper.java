@@ -111,6 +111,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -654,6 +655,7 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
         public TLRPC.VideoSize emojiMarkup;
         public long stars;
         public boolean highQuality;
+        public boolean sendOriginal;
         public MediaController.PhotoEntry originalPhotoEntry;
         public long livePhotoVideoOffset;
         public long livePhotoTimestampUs;
@@ -9398,6 +9400,116 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
     private final static int ERROR_TYPE_UNSUPPORTED = 1;
     private final static int ERROR_TYPE_FILE_TOO_LARGE = 2;
 
+    /**
+     * 本地定制：仍按图片消息发送，但主尺寸直接使用原文件字节，不做缩放和 JPEG 重编码。
+     * 返回 null 表示无法处理，调用方应回退到普通压缩路径。
+     */
+    public TLRPC.TL_photo generateOriginalPhotoSizes(TLRPC.TL_photo photo, String path, Uri imageUri) {
+        if (path == null && imageUri == null) {
+            return null;
+        }
+        final BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        try {
+            if (path != null) {
+                BitmapFactory.decodeFile(path, options);
+            } else {
+                InputStream stream = ApplicationLoader.applicationContext.getContentResolver().openInputStream(imageUri);
+                if (stream != null) {
+                    BitmapFactory.decodeStream(stream, null, options);
+                    stream.close();
+                }
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        }
+        if (options.outWidth <= 0 || options.outHeight <= 0) {
+            return null;
+        }
+        final TLRPC.TL_fileLocationToBeDeprecated location = new TLRPC.TL_fileLocationToBeDeprecated();
+        location.volume_id = Integer.MIN_VALUE;
+        location.dc_id = Integer.MIN_VALUE;
+        location.local_id = SharedConfig.getLastLocalId();
+        location.file_reference = new byte[0];
+        final File cacheFile = new File(FileLoader.getDirectory(FileLoader.MEDIA_DIR_CACHE), location.volume_id + "_" + location.local_id + ".jpg");
+        if (!copyOriginalPhoto(path, imageUri, cacheFile)) {
+            return null;
+        }
+        final ArrayList<TLRPC.PhotoSize> sizes = new ArrayList<>();
+        Bitmap bitmap = ImageLoader.loadBitmap(path, imageUri, 90, 90, true);
+        if (bitmap != null) {
+            TLRPC.PhotoSize thumb = ImageLoader.scaleAndSaveImage(bitmap, 90, 90, 55, true);
+            if (thumb != null) {
+                sizes.add(thumb);
+            }
+            bitmap.recycle();
+        }
+        final TLRPC.TL_photoSize_layer127 size = new TLRPC.TL_photoSize_layer127();
+        size.location = location;
+        size.w = options.outWidth;
+        size.h = options.outHeight;
+        if (size.w <= 100 && size.h <= 100) {
+            size.type = "s";
+        } else if (size.w <= 320 && size.h <= 320) {
+            size.type = "m";
+        } else if (size.w <= 800 && size.h <= 800) {
+            size.type = "x";
+        } else if (size.w <= 1280 && size.h <= 1280) {
+            size.type = "y";
+        } else {
+            size.type = "w";
+        }
+        size.size = (int) cacheFile.length();
+        sizes.add(size);
+        getUserConfig().saveConfig(false);
+        if (photo == null) {
+            photo = new TLRPC.TL_photo();
+        }
+        photo.date = getConnectionsManager().getCurrentTime();
+        photo.sizes = sizes;
+        photo.file_reference = new byte[0];
+        return photo;
+    }
+
+    private static boolean copyOriginalPhoto(String path, Uri imageUri, File destination) {
+        InputStream in = null;
+        OutputStream out = null;
+        try {
+            if (path != null) {
+                in = new FileInputStream(path);
+            } else {
+                in = ApplicationLoader.applicationContext.getContentResolver().openInputStream(imageUri);
+            }
+            if (in == null) {
+                return false;
+            }
+            out = new FileOutputStream(destination);
+            byte[] buffer = new byte[64 * 1024];
+            int read;
+            while ((read = in.read(buffer)) > 0) {
+                out.write(buffer, 0, read);
+            }
+            out.flush();
+            return destination.length() > 0;
+        } catch (Throwable e) {
+            FileLog.e(e);
+            return false;
+        } finally {
+            try {
+                if (in != null) {
+                    in.close();
+                }
+            } catch (Throwable ignore) {
+            }
+            try {
+                if (out != null) {
+                    out.close();
+                }
+            } catch (Throwable ignore) {
+            }
+        }
+    }
+
     private static int prepareSendingDocumentInternal(AccountInstance accountInstance, String path, String originalPath, Uri uri, String mime, long dialogId, MessageObject replyToMsg, MessageObject replyToTopMsg, TL_stories.StoryItem storyItem, ChatActivity.ReplyQuote quote, final ArrayList<TLRPC.MessageEntity> entities, final MessageObject editingMessageObject, long[] groupId, boolean isGroupFinal, CharSequence caption, boolean notify, int scheduleDate, int scheduleRepeatPeriod, Integer[] docType, boolean forceDocument, SendMessageChatArguments sendMessageChatArguments, long effectId, boolean invertMedia, long payStars, long monoForumPeerId, MessageSuggestionParams suggestionParams, PollSendParams pollSendParams, int pollIndex) {
         final long forcedPollGroupId = pollSendParams != null ? pollSendParams.groupId : 0;
 
@@ -10971,7 +11083,10 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                         } else {
                             worker.sync = new CountDownLatch(1);
                             mediaSendThreadPool.execute(() -> {
-                                worker.photo = accountInstance.getSendMessagesHelper().generatePhotoSizes(null, info.path, info.uri, info.highQuality);
+                                worker.photo = info.sendOriginal ? accountInstance.getSendMessagesHelper().generateOriginalPhotoSizes(null, info.path, info.uri) : null;
+                                if (worker.photo == null) {
+                                    worker.photo = accountInstance.getSendMessagesHelper().generatePhotoSizes(null, info.path, info.uri, info.highQuality);
+                                }
                                 if (isEncrypted && info.canDeleteAfter) {
                                     new File(info.path).delete();
                                 }
@@ -11613,7 +11728,12 @@ public class SendMessagesHelper extends BaseController implements NotificationCe
                                     ensureMediaThumbExists(accountInstance, isEncrypted, photo, info.path, info.uri, 0);
                                 }
                                 if (photo == null) {
-                                    photo = accountInstance.getSendMessagesHelper().generatePhotoSizes(info.path, info.uri);
+                                    if (info.sendOriginal) {
+                                        photo = accountInstance.getSendMessagesHelper().generateOriginalPhotoSizes(null, info.path, info.uri);
+                                    }
+                                    if (photo == null) {
+                                        photo = accountInstance.getSendMessagesHelper().generatePhotoSizes(info.path, info.uri);
+                                    }
                                     if (isEncrypted && info.canDeleteAfter) {
                                         new File(info.path).delete();
                                     }

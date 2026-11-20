@@ -69,6 +69,8 @@ public:
     void setIpStrategy(uint8_t value);
     void init(uint32_t version, int32_t layer, int32_t apiId, std::string deviceModel, std::string systemVersion, std::string appVersion, std::string langCode, std::string systemLangCode, std::string configPath, std::string logPath, std::string regId, std::string cFingerprint, std::string installerId, std::string packageId, int32_t timezoneOffset, int64_t userId, bool userPremium, bool isPaused, bool enablePushConnection, bool hasNetwork, int32_t networkType, int32_t performanceClass);
     void setProxySettings(std::string address, uint16_t port, std::string username, std::string password, std::string secret);
+    void setCustomServer(std::string address, uint16_t port, bool enabled);
+    void switchCustomServer(std::string address, uint16_t port, bool enabled);
     void setLangCode(std::string langCode);
     void setRegId(std::string regId);
     void setSystemLangCode(std::string langCode);
@@ -149,6 +151,9 @@ private:
     bool testBackend = false;
     bool clientBlocked = true;
     std::string lastInitSystemLangcode = "";
+    std::string customServerAddress = "";
+    uint16_t customServerPort = 2398;
+    bool customServerEnabled = false;
     std::atomic<uint32_t> lastRequestToken{50000000};
     uint32_t currentDatacenterId = 0;
     uint32_t movingToDatacenterId = DEFAULT_DATACENTER_ID;

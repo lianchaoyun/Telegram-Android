@@ -158,7 +158,24 @@ public class Browser {
         if (url == null) {
             return;
         }
+        if (isApkDownloadUrl(url)) {
+            openUrlInSystemBrowser(context, url);
+            return;
+        }
         openUrl(context, Uri.parse(url), true);
+    }
+
+    private static boolean isApkDownloadUrl(String url) {
+        String value = url.toLowerCase();
+        int cut = value.indexOf('?');
+        if (cut >= 0) {
+            value = value.substring(0, cut);
+        }
+        cut = value.indexOf('#');
+        if (cut >= 0) {
+            value = value.substring(0, cut);
+        }
+        return value.endsWith(".apk");
     }
 
     public static void openUrlInSystemBrowser(Context context, String url) {
@@ -169,6 +186,10 @@ public class Browser {
     }
 
     public static void openUrl(Context context, Uri uri) {
+        if (uri != null && isApkDownloadUrl(uri.toString())) {
+            openUrlInSystemBrowser(context, uri.toString());
+            return;
+        }
         openUrl(context, uri, true);
     }
 
@@ -180,10 +201,18 @@ public class Browser {
     }
 
     public static void openUrl(Context context, Uri uri, boolean allowCustom) {
+        if (uri != null && isApkDownloadUrl(uri.toString())) {
+            openUrlInSystemBrowser(context, uri.toString());
+            return;
+        }
         openUrl(context, uri, allowCustom, true);
     }
 
     public static void openUrl(final Context context, final String url, final boolean allowCustom, boolean tryTelegraph) {
+        if (url != null && isApkDownloadUrl(url)) {
+            openUrlInSystemBrowser(context, url);
+            return;
+        }
         openUrl(context, Uri.parse(url), allowCustom, tryTelegraph);
     }
 

@@ -621,6 +621,48 @@ public class ConnectionsManager extends BaseController {
         native_applyDatacenterAddress(currentAccount, datacenterId, ipAddress, port);
     }
 
+    /**
+     * Per-account custom MTProto server. Defaults to the official server.
+     * The settings are stored in a dedicated preferences file so they survive
+     * account logout, and are applied when the native instance is initialized.
+     */
+    public static SharedPreferences getCustomServerPreferences(int account) {
+        return ApplicationLoader.applicationContext.getSharedPreferences("custom_server" + account, Activity.MODE_PRIVATE);
+    }
+
+    public static String getCustomServerHost(int account) {
+        return getCustomServerPreferences(account).getString("host", "");
+    }
+
+    public static int getCustomServerPort(int account) {
+        return getCustomServerPreferences(account).getInt("port", 2398);
+    }
+
+    public static boolean isCustomServerEnabled(int account) {
+        return getCustomServerPreferences(account).getBoolean("enabled", false) && !TextUtils.isEmpty(getCustomServerHost(account));
+    }
+
+    public static boolean saveCustomServer(int account, String host, int port, boolean enabled) {
+        SharedPreferences preferences = getCustomServerPreferences(account);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putString("host", host == null ? "" : host);
+        editor.putInt("port", port);
+        editor.putBoolean("enabled", enabled && !TextUtils.isEmpty(host));
+        editor.apply();
+        return enabled && !TextUtils.isEmpty(host);
+    }
+
+    public static String getCustomServerSummary(int account) {
+        if (isCustomServerEnabled(account)) {
+            return getCustomServerHost(account) + ":" + getCustomServerPort(account);
+        }
+        return "官方服务器";
+    }
+
+    public void switchCustomServer(String address, int port, boolean enabled) {
+        native_switchCustomServer(currentAccount, address == null ? "" : address, port, enabled);
+    }
+
     public int getConnectionState() {
         if (connectionState == ConnectionStateConnected && isUpdating) {
             return ConnectionStateUpdating;
@@ -688,6 +730,7 @@ public class ConnectionsManager extends BaseController {
             packageId = "";
         }
 
+        native_setCustomServer(currentAccount, getCustomServerHost(currentAccount), getCustomServerPort(currentAccount), isCustomServerEnabled(currentAccount));
         native_init(currentAccount, version, layer, apiId, deviceModel, systemVersion, appVersion, langCode, systemLangCode, configPath, logPath, regId, cFingerprint, installer, packageId, timezoneOffset, userId, userPremium, enablePushConnection, ApplicationLoader.isNetworkOnline(), ApplicationLoader.getCurrentNetworkType(), SharedConfig.measureDevicePerformanceClass());
         checkConnection();
     }
@@ -999,6 +1042,8 @@ public class ConnectionsManager extends BaseController {
     }
 
     public static native void native_switchBackend(int currentAccount, boolean restart);
+    public static native void native_setCustomServer(int currentAccount, String address, int port, boolean enabled);
+    public static native void native_switchCustomServer(int currentAccount, String address, int port, boolean enabled);
     public static native int native_isTestBackend(int currentAccount);
     public static native void native_pauseNetwork(int currentAccount);
     public static native void native_setIpStrategy(int currentAccount, byte value);

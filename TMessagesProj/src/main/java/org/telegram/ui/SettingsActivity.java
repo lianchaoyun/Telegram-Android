@@ -108,6 +108,7 @@ import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.CubicBezierInterpolator;
+import org.telegram.ui.Components.CustomServerConfig;
 import org.telegram.ui.Components.FloatingDebug.FloatingDebugController;
 import org.telegram.ui.Components.FragmentFloatingButton;
 import org.telegram.ui.Components.HintsController;
@@ -725,6 +726,8 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
         items.add(SettingCell.Factory.of(8, IconBackgroundColors.CYAN.top, IconBackgroundColors.CYAN.bottom, R.drawable.settings_devices, getString(R.string.SettingsDevices), getString(R.string.SettingsDevicesInfo)));
         items.add(SettingCell.Factory.of(9, IconBackgroundColors.ORANGE_DEEP.top, IconBackgroundColors.ORANGE_DEEP.bottom, R.drawable.settings_power, getString(R.string.SettingsPowerSaving), getString(R.string.SettingsPowerSavingInfo)));
         items.add(SettingCell.Factory.of(10, IconBackgroundColors.PURPLE.top, IconBackgroundColors.PURPLE.bottom, R.drawable.settings_language, getString(R.string.SettingsLanguage), LocaleController.getCurrentLanguageName()));
+        items.add(SettingCell.Factory.of(27, IconBackgroundColors.BLUE_DEEP.top, IconBackgroundColors.BLUE_DEEP.bottom, R.drawable.settings_data, "服务器", ConnectionsManager.getCustomServerSummary(currentAccount)));
+        items.add(SettingCell.Factory.of(28, 0xFFE5484D, 0xFFFF7A45, R.drawable.settings_features, "实验室", "自定义界面 · 检查更新"));
 
         items.add(UItem.asShadow(null));
         if (!walletAbove && getMessagesController().config.walletAvailable.get()) {
@@ -917,6 +920,18 @@ public class SettingsActivity extends BaseFragment implements NotificationCenter
             }
             case 26: {
                 presentFragment(new AudioRecorderSettingsActivity());
+                break;
+            }
+            case 27: {
+                CustomServerConfig.showDialog(getParentActivity(), currentAccount, false, () -> {
+                    if (listView != null) {
+                        listView.adapter.update(true);
+                    }
+                });
+                break;
+            }
+            case 28: {
+                presentFragment(new TomatoCustomActivity());
                 break;
             }
         }

@@ -384,6 +384,17 @@ void Handshake::processHandshakeResponse_resPQ(TLObject *message, int64_t messag
                                                   "-----END RSA PUBLIC KEY-----");
                     serverPublicKeysFingerprints.push_back(0xd09d1d85de64fd85);
                 }
+                // Custom build: accept the self-hosted server's public key
+                // regardless of the Test Backend flag.
+                serverPublicKeys.emplace_back("-----BEGIN RSA PUBLIC KEY-----\n"
+                                              "MIIBCgKCAQEAmvD9i/2UN06ipwuCrD+hIkxAwodiJ1QY4Q4YEdrM6UpPT2V2IoJG\n"
+                                              "526iYxkp/E3V36CHrUsS+wGrfuceklLPU5CVd94W+9McqgwUQv5h3xq+qKGXdXXK\n"
+                                              "x5LX+uXCFXKKSN0d5gdkirupyrhVbTLT0LG0ND+yZISIOPScQBHDlkFtzKhvH8DE\n"
+                                              "sYuzNZlv7ttkghLugmdY+aV/cFVI4p4mtORBpHLKgdwvbIJ7Ks4w0qgWJ77cAQFl\n"
+                                              "fkK1lqreOh2wUj01e+tvFsqn6aWP3oiAkED8rEUwaounwzyMVcmPW6rDu49aUqZ0\n"
+                                              "dJUo1ud0pP5yNg+ss4/iwKn8U5pr/RrNMwIDAQAB\n"
+                                              "-----END RSA PUBLIC KEY-----");
+                serverPublicKeysFingerprints.push_back(15774995475233274642ULL);
             }
 
             size_t count2 = serverPublicKeysFingerprints.size();

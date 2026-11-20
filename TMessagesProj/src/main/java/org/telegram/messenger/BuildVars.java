@@ -26,8 +26,11 @@ public class BuildVars {
     public static boolean NO_SCOPED_STORAGE = Build.VERSION.SDK_INT <= 29;
     public static String BUILD_VERSION_STRING = BuildConfig.BUILD_VERSION_STRING;
 
-    public static int APP_ID = 4;
-    public static String APP_HASH = "014b35b6184100b085b0d0572f9b5103";
+    // Personal API credentials (the same application already used by the
+    // desktop build). The published Telegram Android credentials are rejected
+    // by the official servers with API_ID_PUBLISHED_FLOOD.
+    public static int APP_ID = 38228949;
+    public static String APP_HASH = "52d939299588b14e749738ca648e7f31";
 
     // SafetyNet key for Google Identity SDK, set it to empty to disable
     public static String SAFETYNET_KEY = "AIzaSyDqt8P-7F7CPCseMkOiVRgb1LY8RN1bvH8";

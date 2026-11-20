@@ -262,6 +262,24 @@ void switchBackend(JNIEnv *env, jclass c, jint instanceNum, jboolean restart) {
     ConnectionsManager::getInstance(instanceNum).switchBackend(restart);
 }
 
+void setCustomServer(JNIEnv *env, jclass c, jint instanceNum, jstring address, jint port, jboolean enabled) {
+    const char *addressStr = address != nullptr ? env->GetStringUTFChars(address, 0) : nullptr;
+    std::string addressValue = addressStr != nullptr ? std::string(addressStr) : std::string();
+    ConnectionsManager::getInstance(instanceNum).setCustomServer(addressValue, (uint16_t) port, enabled);
+    if (addressStr != nullptr) {
+        env->ReleaseStringUTFChars(address, addressStr);
+    }
+}
+
+void switchCustomServer(JNIEnv *env, jclass c, jint instanceNum, jstring address, jint port, jboolean enabled) {
+    const char *addressStr = address != nullptr ? env->GetStringUTFChars(address, 0) : nullptr;
+    std::string addressValue = addressStr != nullptr ? std::string(addressStr) : std::string();
+    ConnectionsManager::getInstance(instanceNum).switchCustomServer(addressValue, (uint16_t) port, enabled);
+    if (addressStr != nullptr) {
+        env->ReleaseStringUTFChars(address, addressStr);
+    }
+}
+
 void pauseNetwork(JNIEnv *env, jclass c, jint instanceNum) {
     ConnectionsManager::getInstance(instanceNum).pauseNetwork();
 }
@@ -545,6 +563,8 @@ static JNINativeMethod ConnectionsManagerMethods[] = {
         {"native_setRegId", "(ILjava/lang/String;)V", (void *) setRegId},
         {"native_setSystemLangCode", "(ILjava/lang/String;)V", (void *) setSystemLangCode},
         {"native_switchBackend", "(IZ)V", (void *) switchBackend},
+        {"native_setCustomServer", "(ILjava/lang/String;IZ)V", (void *) setCustomServer},
+        {"native_switchCustomServer", "(ILjava/lang/String;IZ)V", (void *) switchCustomServer},
         {"native_pauseNetwork", "(I)V", (void *) pauseNetwork},
         {"native_resumeNetwork", "(IZ)V", (void *) resumeNetwork},
         {"native_updateDcSettings", "(I)V", (void *) updateDcSettings},

@@ -1817,64 +1817,78 @@ uint8_t ConnectionsManager::getIpStratagy() {
 }
 
 void ConnectionsManager::initDatacenters() {
-    Datacenter *datacenter;
+    std::vector<TcpAddress> emptyAddresses;
+
+    // Creates the datacenter or force-replaces its persisted addresses with
+    // the ones of the currently selected backend. The second variant is used
+    // when the user switches between the official server and a custom one:
+    // datacenters loaded from tgnet.dat still hold the previous addresses.
+    auto createOrUpdate = [this](int32_t dcId, const std::vector<TcpAddress> &ipv4, const std::vector<TcpAddress> &ipv6, const std::vector<TcpAddress> *ipv4Download, const std::vector<TcpAddress> *ipv6Download) {
+        auto iter = datacenters.find(dcId);
+        if (iter == datacenters.end()) {
+            Datacenter *datacenter = new Datacenter(instanceNum, dcId);
+            for (auto &address : ipv4) {
+                datacenter->addAddressAndPort(address.address, (uint32_t) address.port, 0, address.secret);
+            }
+            for (auto &address : ipv6) {
+                datacenter->addAddressAndPort(address.address, (uint32_t) address.port, 1, address.secret);
+            }
+            if (ipv4Download != nullptr) {
+                for (auto &address : *ipv4Download) {
+                    datacenter->addAddressAndPort(address.address, (uint32_t) address.port, 2, address.secret);
+                }
+            }
+            if (ipv6Download != nullptr) {
+                for (auto &address : *ipv6Download) {
+                    datacenter->addAddressAndPort(address.address, (uint32_t) address.port, 3, address.secret);
+                }
+            }
+            datacenters[dcId] = datacenter;
+        } else {
+            Datacenter *datacenter = iter->second;
+            std::vector<TcpAddress> copy = ipv4;
+            datacenter->replaceAddresses(copy, 0);
+            copy = ipv6;
+            datacenter->replaceAddresses(copy, 1);
+            if (ipv4Download != nullptr) {
+                copy = *ipv4Download;
+                datacenter->replaceAddresses(copy, 2);
+            }
+            if (ipv6Download != nullptr) {
+                copy = *ipv6Download;
+                datacenter->replaceAddresses(copy, 3);
+            }
+            // Addresses persisted from an older backend must not survive a
+            // backend switch: in particular temp addresses are preferred over
+            // the regular ones before the first auth key is created.
+            if (!datacenter->hasPermanentAuthKey()) {
+                std::vector<TcpAddress> clearTemp;
+                datacenter->replaceAddresses(clearTemp, TcpAddressFlagTemp);
+            }
+        }
+    };
+
+    // Custom build: route every DC of this account to the configured server,
+    // regardless of the "Test Backend" flag.
+    if (customServerEnabled && !customServerAddress.empty()) {
+        std::vector<TcpAddress> addresses;
+        addresses.emplace_back(customServerAddress, (int32_t) customServerPort, 0, "");
+        for (int32_t dc = 1; dc <= 5; dc++) {
+            createOrUpdate(dc, addresses, emptyAddresses, &addresses, &emptyAddresses);
+        }
+        return;
+    }
+
     if (!testBackend) {
-        if (datacenters.find(1) == datacenters.end()) {
-            datacenter = new Datacenter(instanceNum, 1);
-            datacenter->addAddressAndPort("149.154.175.50", 443, 0, "");
-            datacenter->addAddressAndPort("2001:b28:f23d:f001:0000:0000:0000:000a", 443, 1, "");
-            datacenters[1] = datacenter;
-        }
-
-        if (datacenters.find(2) == datacenters.end()) {
-            datacenter = new Datacenter(instanceNum, 2);
-            datacenter->addAddressAndPort("149.154.167.51", 443, 0, "");
-            datacenter->addAddressAndPort("95.161.76.100", 443, 0, "");
-            datacenter->addAddressAndPort("2001:67c:4e8:f002:0000:0000:0000:000a", 443, 1, "");
-            datacenters[2] = datacenter;
-        }
-
-        if (datacenters.find(3) == datacenters.end()) {
-            datacenter = new Datacenter(instanceNum, 3);
-            datacenter->addAddressAndPort("149.154.175.100", 443, 0, "");
-            datacenter->addAddressAndPort("2001:b28:f23d:f003:0000:0000:0000:000a", 443, 1, "");
-            datacenters[3] = datacenter;
-        }
-
-        if (datacenters.find(4) == datacenters.end()) {
-            datacenter = new Datacenter(instanceNum, 4);
-            datacenter->addAddressAndPort("149.154.167.91", 443, 0, "");
-            datacenter->addAddressAndPort("2001:67c:4e8:f004:0000:0000:0000:000a", 443, 1, "");
-            datacenters[4] = datacenter;
-        }
-
-        if (datacenters.find(5) == datacenters.end()) {
-            datacenter = new Datacenter(instanceNum, 5);
-            datacenter->addAddressAndPort("149.154.171.5", 443, 0, "");
-            datacenter->addAddressAndPort("2001:b28:f23f:f005:0000:0000:0000:000a", 443, 1, "");
-            datacenters[5] = datacenter;
-        }
+        createOrUpdate(1, {{"149.154.175.50", 443, 0, ""}}, {{"2001:b28:f23d:f001:0000:0000:0000:000a", 443, 1, ""}}, &emptyAddresses, &emptyAddresses);
+        createOrUpdate(2, {{"149.154.167.51", 443, 0, ""}, {"95.161.76.100", 443, 0, ""}}, {{"2001:67c:4e8:f002:0000:0000:0000:000a", 443, 1, ""}}, &emptyAddresses, &emptyAddresses);
+        createOrUpdate(3, {{"149.154.175.100", 443, 0, ""}}, {{"2001:b28:f23d:f003:0000:0000:0000:000a", 443, 1, ""}}, &emptyAddresses, &emptyAddresses);
+        createOrUpdate(4, {{"149.154.167.91", 443, 0, ""}}, {{"2001:67c:4e8:f004:0000:0000:0000:000a", 443, 1, ""}}, &emptyAddresses, &emptyAddresses);
+        createOrUpdate(5, {{"149.154.171.5", 443, 0, ""}}, {{"2001:b28:f23f:f005:0000:0000:0000:000a", 443, 1, ""}}, &emptyAddresses, &emptyAddresses);
     } else {
-        if (datacenters.find(1) == datacenters.end()) {
-            datacenter = new Datacenter(instanceNum, 1);
-            datacenter->addAddressAndPort("149.154.175.40", 443, 0, "");
-            datacenter->addAddressAndPort("2001:b28:f23d:f001:0000:0000:0000:000e", 443, 1, "");
-            datacenters[1] = datacenter;
-        }
-
-        if (datacenters.find(2) == datacenters.end()) {
-            datacenter = new Datacenter(instanceNum, 2);
-            datacenter->addAddressAndPort("149.154.167.40", 443, 0, "");
-            datacenter->addAddressAndPort("2001:67c:4e8:f002:0000:0000:0000:000e", 443, 1, "");
-            datacenters[2] = datacenter;
-        }
-
-        if (datacenters.find(3) == datacenters.end()) {
-            datacenter = new Datacenter(instanceNum, 3);
-            datacenter->addAddressAndPort("149.154.175.117", 443, 0, "");
-            datacenter->addAddressAndPort("2001:b28:f23d:f003:0000:0000:0000:000e", 443, 1, "");
-            datacenters[3] = datacenter;
-        }
+        createOrUpdate(1, {{"149.154.175.40", 443, 0, ""}}, {{"2001:b28:f23d:f001:0000:0000:0000:000e", 443, 1, ""}}, &emptyAddresses, &emptyAddresses);
+        createOrUpdate(2, {{"149.154.167.40", 443, 0, ""}}, {{"2001:67c:4e8:f002:0000:0000:0000:000e", 443, 1, ""}}, &emptyAddresses, &emptyAddresses);
+        createOrUpdate(3, {{"149.154.175.117", 443, 0, ""}}, {{"2001:b28:f23d:f003:0000:0000:0000:000e", 443, 1, ""}}, &emptyAddresses, &emptyAddresses);
     }
 }
 
@@ -2056,6 +2070,26 @@ void ConnectionsManager::switchBackend(bool restart) {
         if (restart) {
             exit(1);
         }
+    });
+}
+
+void ConnectionsManager::setCustomServer(std::string address, uint16_t port, bool enabled) {
+    customServerAddress = address;
+    customServerPort = port;
+    customServerEnabled = enabled && !address.empty();
+}
+
+void ConnectionsManager::switchCustomServer(std::string address, uint16_t port, bool enabled) {
+    scheduleTask([this, address, port, enabled] {
+        bool newEnabled = enabled && !address.empty();
+        if (newEnabled == customServerEnabled && (!newEnabled || (address == customServerAddress && port == customServerPort))) {
+            return;
+        }
+        setCustomServer(address, port, enabled);
+        currentDatacenterId = 2;
+        datacenters.clear();
+        initDatacenters();
+        saveConfig();
     });
 }
 
@@ -3467,10 +3501,12 @@ void ConnectionsManager::updateDcSettings(uint32_t dcNum, bool workaround, bool 
                         datacenter = new Datacenter(instanceNum, iter.first);
                         datacenters[iter.first] = datacenter;
                     }
-                    datacenter->replaceAddresses(info->addressesIpv4, info->isCdn ? 8 : 0);
-                    datacenter->replaceAddresses(info->addressesIpv6, info->isCdn ? 9 : 1);
-                    datacenter->replaceAddresses(info->addressesIpv4Download, info->isCdn ? 10 : 2);
-                    datacenter->replaceAddresses(info->addressesIpv6Download, info->isCdn ? 11 : 3);
+                    if (!customServerEnabled) {
+                        datacenter->replaceAddresses(info->addressesIpv4, info->isCdn ? 8 : 0);
+                        datacenter->replaceAddresses(info->addressesIpv6, info->isCdn ? 9 : 1);
+                        datacenter->replaceAddresses(info->addressesIpv4Download, info->isCdn ? 10 : 2);
+                        datacenter->replaceAddresses(info->addressesIpv6Download, info->isCdn ? 11 : 3);
+                    }
                     if (iter.first == movingToDatacenterId) {
                         movingToDatacenterId = DEFAULT_DATACENTER_ID;
                         moveToDatacenter(iter.first);
@@ -3715,6 +3751,11 @@ void ConnectionsManager::init(uint32_t version, int32_t layer, int32_t apiId, st
     }
 
     loadConfig();
+
+    // Custom build: the "official" option must always mean the production
+    // Telegram servers. Never keep a test-backend flag persisted by older
+    // builds or debug sessions.
+    testBackend = false;
 
     bool needLoadConfig = false;
     if (systemLangCode.compare(lastInitSystemLangcode) != 0) {

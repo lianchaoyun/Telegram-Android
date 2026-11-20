@@ -158,7 +158,9 @@ import org.telegram.ui.ActionBar.INavigationLayout;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.ActionBar.ThemeDescription;
 import org.telegram.ui.Cells.CheckBoxCell;
+import org.telegram.ui.Cells.TextSettingsCell;
 import org.telegram.ui.Components.AlertsCreator;
+import org.telegram.ui.Components.CustomServerConfig;
 import org.telegram.ui.Components.AnimatedPhoneNumberEditText;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BackupImageView;
@@ -1967,6 +1969,7 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
         private ImageView chevronRight;
         private CheckBoxCell syncContactsBox;
         private CheckBoxCell testBackendCheckBox;
+        private TextSettingsCell serverCell;
 
         @CountryState
         private int countryState = COUNTRY_STATE_NOT_SET_OR_VALID;
@@ -2475,7 +2478,10 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                 });
             }
 
-            final boolean allowTestBackend = (BuildVars.DEBUG_VERSION || TEST_BACKEND_IN_STORE && !BuildConfig.BUNDLE) || getConnectionsManager().isTestBackend();
+            // This custom build always uses the production official servers
+            // when no custom server is configured, so the debug test backend
+            // switch is intentionally hidden.
+            final boolean allowTestBackend = false;
             if (allowTestBackend && activityMode == MODE_LOGIN) {
                 testBackendCheckBox = new CheckBoxCell(context, 2);
                 testBackendCheckBox.setText(getString(R.string.DebugTestBackend), "", testBackend = getConnectionsManager().isTestBackend(), false);
@@ -2495,6 +2501,19 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
                     }
                     loadCountries();
                 });
+            }
+
+            if (activityMode == MODE_LOGIN) {
+                serverCell = new TextSettingsCell(context);
+                updateServerCellText();
+                addView(serverCell, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 0, 0, 0, 0));
+                serverCell.setOnClickListener(v -> {
+                    if (getParentActivity() == null) {
+                        return;
+                    }
+                    CustomServerConfig.showDialog(getParentActivity(), currentAccount, true, this::updateServerCellText);
+                });
+                bottomMargin -= 24;
             }
 
             if (bottomMargin > 0 && !AndroidUtilities.isSmallScreen()) {
@@ -2733,6 +2752,12 @@ public class LoginActivity extends BaseFragment implements NotificationCenter.No
             ignoreOnTextChange = false;
 
             MessagesController.getGlobalMainSettings().edit().putString("phone_code_last_matched_" + country.code, country.shortname).apply();
+        }
+
+        private void updateServerCellText() {
+            if (serverCell != null) {
+                serverCell.setTextAndValue("服务器", ConnectionsManager.getCustomServerSummary(currentAccount), false);
+            }
         }
 
         private String countryCodeForHint;

@@ -655,6 +655,10 @@ public class ApplicationLoader extends Application {
         return false;
     }
 
+    public boolean showUpdateAppPopup(Context context, TLRPC.TL_help_appUpdate update, int account, boolean forced) {
+        return showUpdateAppPopup(context, update, account);
+    }
+
     public boolean showCustomUpdateAppPopup(Context context, BetaUpdate update, int account) {
         return false;
     }

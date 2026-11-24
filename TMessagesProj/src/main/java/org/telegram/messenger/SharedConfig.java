@@ -555,7 +555,7 @@ public class SharedConfig {
             } else {
                 passcodeSalt = new byte[0];
             }
-            lastUpdateCheckTime = preferences.getLong("appUpdateCheckTime", System.currentTimeMillis());
+            lastUpdateCheckTime = preferences.getLong("appUpdateCheckTime", 0L);
             try {
                 String update = preferences.getString("appUpdate", null);
                 if (update != null) {

@@ -6099,7 +6099,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
             });
             return;
         }
-        if (!force && Math.abs(System.currentTimeMillis() - SharedConfig.lastUpdateCheckTime) < MessagesController.getInstance(0).updateCheckDelay * 1000) {
+        // Self-hosted builds should notice a release reasonably soon; cap the
+        // server-configured delay at ten minutes instead of the default 24 hours.
+        if (!force && Math.abs(System.currentTimeMillis() - SharedConfig.lastUpdateCheckTime) < Math.min(MessagesController.getInstance(0).updateCheckDelay, 600) * 1000) {
             return;
         }
         final TLRPC.TL_help_getAppUpdate req = new TLRPC.TL_help_getAppUpdate();
@@ -6126,7 +6128,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
                         if (res.can_not_skip) {
                             showUpdateActivity(accountNum, res, false);
                         } else if (ApplicationLoader.isStandaloneBuild() || BuildVars.DEBUG_VERSION) {
-                            ApplicationLoader.applicationLoaderInstance.showUpdateAppPopup(LaunchActivity.this, res, accountNum);
+                            ApplicationLoader.applicationLoaderInstance.showUpdateAppPopup(LaunchActivity.this, res, accountNum, force);
                         }
                         NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.appUpdateAvailable);
                     }
